@@ -1,30 +1,32 @@
 # pgpmana
 
-A small macOS app for managing your PostgreSQL password file (`~/.pgpass`, or the file in `$PGPASSFILE`).
+pgpmana is a small Mac app for your PostgreSQL password file. It edits `~/.pgpass`, or the file in `$PGPASSFILE` if you set one.
 
-What it does:
+Website: https://technotronicoz.github.io/pgpmana/
 
-- Lists entries in file order, with comments and blank lines kept where they are.
-- Flags entries that are never used because an earlier line matches every connection they would. libpq uses the first matching line.
-- Adds and edits entries, with an "Any (*)" box per field and a live preview of the escaped line.
-- Lets you reorder entries by dragging.
-- Has a Match Tester window (⇧⌘T): type a host, port, database and user, and it shows which entry libpq would pick.
-- Warns when the file mode lets group or others read it. libpq ignores the file in that case. One click sets it to 0600.
+## What it does
+
+- Lists entries in file order and keeps comments and blank lines where they are.
+- Marks entries that never get used. libpq stops at the first line that matches. An earlier line can match every connection a later line would, and then the later line never wins.
+- Adds and edits entries. Each field has an "Any (*)" box, and a preview shows the exact line pgpmana will write, escapes included.
+- Lets you drag entries to reorder them.
+- Has a Match Tester window (⇧⌘T). Type a host, port, database and user, and it shows which entry libpq would pick.
+- Warns you when group or others can read the file, because libpq ignores the file then. One click sets it to 0600.
 
 ## Saving
 
-Changes stay in memory until you press ⌘S. A save:
+Changes stay in memory until you press ⌘S. Then pgpmana:
 
-1. copies the current file to `~/.pgpass.pgpmana.bak` (mode 0600),
-2. writes a new temp file created with mode 0600 in the same folder,
-3. renames it over `~/.pgpass`.
+1. Copies the current file to `~/.pgpass.pgpmana.bak`, with mode 0600.
+2. Writes a new temp file in the same folder, created with mode 0600.
+3. Renames the temp file over `~/.pgpass`.
 
-Lines you didn't touch are written back exactly as they were. If the file changed on disk after pgpmana read it, saving stops and asks you to reload or overwrite. Quitting with unsaved changes asks first.
+pgpmana writes lines you didn't touch back exactly as they were. If another program changed the file after pgpmana read it, the save stops and asks you to reload or overwrite. If you quit with unsaved changes, pgpmana asks first.
 
 ## Requirements
 
 - macOS 14 or later
-- Xcode 15 or later (`swift test` needs Xcode for XCTest; Command Line Tools alone can build but not test)
+- Xcode 15 or later. `swift test` needs Xcode for XCTest. The Command Line Tools alone can build the app but can't run the tests.
 
 ## Build and run
 
@@ -38,20 +40,20 @@ open Package.swift         # open the package in Xcode
 
 ## Notes
 
-- The app is not sandboxed, so it can read and write `~/.pgpass` directly. That rules out the Mac App Store.
-- Apps launched from Finder or the Dock don't inherit your shell's environment, so `$PGPASSFILE` from your shell profile won't apply there. Launched with `swift run pgpmana` from a terminal, it does.
+- The app isn't sandboxed, so it can read and write `~/.pgpass` directly. That also means it can't go in the Mac App Store.
+- Apps you open from Finder or the Dock don't get your shell's environment. A `$PGPASSFILE` set in your shell profile won't apply there. It does apply when you start the app with `swift run pgpmana` from a terminal.
 
-## Look
+## Look and feel
 
-The app uses the Nabis design system's dark theme: graphite surfaces, gold as the only accent, Inter for text and Roboto Mono for labels and values. Colors, fonts, buttons, fields and cards live in `Sources/pgpmana/Theme.swift`.
+The app uses the dark theme from the Nabis design system: graphite surfaces, gold as the only accent, Inter for text and Roboto Mono for labels and values. `Sources/pgpmana/Theme.swift` holds the colors, fonts, buttons, fields and cards.
 
-Inter and Roboto Mono are bundled in `Sources/pgpmana/Resources/Fonts` under the SIL Open Font License (license files sit next to the fonts). They're registered for the app's process only, so nothing gets installed system-wide.
+The app bundles Inter and Roboto Mono in `Sources/pgpmana/Resources/Fonts`, with their license files next to them. It registers the fonts for its own process only, so nothing gets installed system-wide.
 
 ## Logo and icon
 
-The faceted blue elephant logo's source is `Design/pgpmana-logo.svg`, with a 1024px render beside it. `Support/AppIcon.icns` is the app icon that `scripts/bundle.sh` puts in the .app, and `Sources/pgpmana/Resources/Images/AppLogo.png` is what the About sheet shows. When run with `swift run`, the app sets its Dock icon from that PNG.
+`Design/pgpmana-logo.svg` is the source for the faceted blue elephant logo, and `Design/pgpmana-logo-1024.png` is a full-size render. `scripts/bundle.sh` copies `Support/AppIcon.icns` into the .app as its icon. The About sheet shows `Sources/pgpmana/Resources/Images/AppLogo.png`. When you start the app with `swift run`, it uses that PNG as its Dock icon too.
 
-To regenerate the icon after editing the SVG (needs `rsvg-convert` from librsvg):
+After you edit the SVG, rebuild the icon with these commands. They need `rsvg-convert` from librsvg.
 
 ```sh
 mkdir -p /tmp/AppIcon.iconset
@@ -65,19 +67,25 @@ cp /tmp/AppIcon.iconset/icon_512x512.png Sources/pgpmana/Resources/Images/AppLog
 
 ## About
 
-pgpmana was created by Matt Carter (carter.matt@icloud.com). The app menu's "About pgpmana" opens a sheet with the logo, version and contact.
+Matt Carter (carter.matt@icloud.com) made pgpmana. In the app, choose pgpmana › About pgpmana to see the logo, the version and how to get in touch.
 
-## Layout
+## Project layout
 
-- `Sources/PgpassKit`: parser, matcher and file writing. Foundation only, with tests.
+- `Sources/PgpassKit`: the parser, the matcher and the file writing. It uses only Foundation and has tests.
 - `Sources/pgpmana`: the SwiftUI app.
 
 ## Website
 
-The marketing site lives in `docs/` as a single static page (`docs/index.html` plus `docs/assets/`), with no build step. To publish it on GitHub Pages, open the repo's Settings › Pages, choose "Deploy from a branch", and pick `main` and `/docs`. It will be served at https://technotronicoz.github.io/pgpmana/.
+The marketing site is one static page in `docs/` (`docs/index.html` plus `docs/assets/`). It has no build step. To publish it with GitHub Pages:
+
+1. Open the repo's Settings › Pages.
+2. Choose "Deploy from a branch".
+3. Pick `main` and `/docs`.
+
+The site will be at https://technotronicoz.github.io/pgpmana/.
 
 ## License
 
-pgpmana is released under the [MIT License](LICENSE). Copyright (c) 2026 Matt Carter.
+pgpmana uses the [MIT License](LICENSE). Copyright (c) 2026 Matt Carter.
 
-The bundled fonts are under their own license. Inter and Roboto Mono in `Sources/pgpmana/Resources/Fonts` are distributed under the SIL Open Font License 1.1; see `Inter-OFL.txt` and `RobotoMono-OFL.txt` in that folder.
+The bundled fonts have their own license. Inter and Roboto Mono in `Sources/pgpmana/Resources/Fonts` use the SIL Open Font License 1.1. See `Inter-OFL.txt` and `RobotoMono-OFL.txt` in that folder.
