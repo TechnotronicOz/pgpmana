@@ -49,7 +49,7 @@ Inter and Roboto Mono are bundled in `Sources/pgpmana/Resources/Fonts` under the
 
 ## Logo and icon
 
-The flexing blue elephant logo's source is `Design/pgpmana-logo.svg`, with a 1024px render beside it. `Support/AppIcon.icns` is the app icon that `scripts/bundle.sh` puts in the .app, and `Sources/pgpmana/Resources/Images/AppLogo.png` is what the About sheet shows. When run with `swift run`, the app sets its Dock icon from that PNG.
+The faceted blue elephant logo's source is `Design/pgpmana-logo.svg`, with a 1024px render beside it. `Support/AppIcon.icns` is the app icon that `scripts/bundle.sh` puts in the .app, and `Sources/pgpmana/Resources/Images/AppLogo.png` is what the About sheet shows. When run with `swift run`, the app sets its Dock icon from that PNG.
 
 To regenerate the icon after editing the SVG (needs `rsvg-convert` from librsvg):
 
@@ -71,3 +71,13 @@ pgpmana was created by Matt Carter (carter.matt@icloud.com). The app menu's "Abo
 
 - `Sources/PgpassKit`: parser, matcher and file writing. Foundation only, with tests.
 - `Sources/pgpmana`: the SwiftUI app.
+
+## Website
+
+The marketing site lives in `docs/` as a single static page (`docs/index.html` plus `docs/assets/`), with no build step. To publish it on GitHub Pages, open the repo's Settings › Pages, choose "Deploy from a branch", and pick `main` and `/docs`. It will be served at https://technotronicoz.github.io/pgpmana/.
+
+## License
+
+pgpmana is released under the [MIT License](LICENSE). Copyright (c) 2026 Matt Carter.
+
+The bundled fonts are under their own license. Inter and Roboto Mono in `Sources/pgpmana/Resources/Fonts` are distributed under the SIL Open Font License 1.1; see `Inter-OFL.txt` and `RobotoMono-OFL.txt` in that folder.

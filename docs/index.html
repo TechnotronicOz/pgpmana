@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pgpmana: a native Mac app for your ~/.pgpass</title>
+<meta name="description" content="pgpmana is a free, open source Mac app for your PostgreSQL password file. It shows which line libpq will use and warns you about lines that can never match.">
+<meta property="og:title" content="pgpmana: a native Mac app for your ~/.pgpass">
+<meta property="og:description" content="A free Mac app for your PostgreSQL password file. It shows which line libpq will use and warns you about lines that can never match.">
+<meta property="og:image" content="https://technotronicoz.github.io/pgpmana/assets/social-card.png">
+<meta property="og:url" content="https://technotronicoz.github.io/pgpmana/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="assets/favicon-64.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --graphite: #1a1a18;
+    --smoke: #262624;
+    --ash: #323230;
+    --flint: #444440;
+    --bright: #fafaf8;
+    --cool: #f5f3ee;
+    --stone-soft: #eae7e0;
+    --mist: #d8d6d0;
+    --pewter: #b2b0ab;
+    --stone: #8c8a84;
+    --solar: #f2be52;
+    --amber: #e8aa3c;
+    --blue: #4a8fe0;
+    --blue-light: #8cc2f7;
+    --border: #45443e;
+    --border-soft: #3a3a36;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --max: 1120px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--graphite);
+    color: var(--mist);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--amber); text-decoration: none; }
+  a:hover { color: var(--solar); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--solar); outline-offset: 3px; border-radius: 6px; }
+  code, pre { font-family: var(--mono); }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin: 0 0 14px;
+  }
+  h1, h2, h3 { color: var(--bright); margin: 0; }
+  h2 { font-size: clamp(28px, 4vw, 40px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+  h3 { font-size: 18px; font-weight: 600; line-height: 1.3; }
+  .lead { font-size: clamp(18px, 2.2vw, 21px); color: var(--pewter); line-height: 1.55; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 46px; padding: 0 22px; border-radius: 999px;
+    font-weight: 600; font-size: 15px; white-space: nowrap;
+    border: 1px solid var(--border);
+    color: var(--bright);
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .btn:hover { background: var(--ash); border-color: var(--flint); color: var(--bright); }
+  .btn-primary { background: var(--solar); border-color: var(--solar); color: var(--graphite); }
+  .btn-primary:hover { background: #f7cf73; border-color: #f7cf73; color: var(--graphite); }
+  .btn svg { width: 18px; height: 18px; }
+
+  /* Nav */
+  .nav {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(26, 26, 24, 0.82);
+    backdrop-filter: saturate(140%) blur(12px);
+    -webkit-backdrop-filter: saturate(140%) blur(12px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--bright); font-weight: 700; letter-spacing: -0.01em; font-size: 18px; }
+  .brand img { width: 36px; height: 36px; }
+  .nav-links { display: flex; gap: 24px; margin-left: auto; align-items: center; }
+  .nav-links a { color: var(--mist); font-size: 15px; font-weight: 500; }
+  .nav-links a:hover { color: var(--bright); }
+  .nav-links .btn { height: 38px; padding: 0 16px; font-size: 14px; }
+  @media (max-width: 720px) { .nav-links a:not(.btn) { display: none; } }
+
+  /* Hero */
+  .hero { padding: 88px 0 56px; position: relative; overflow: hidden; }
+  .hero::before {
+    content: ""; position: absolute; inset: -20% -10% auto auto; width: 720px; height: 720px;
+    background: radial-gradient(closest-side, rgba(74, 143, 224, 0.22), transparent);
+    pointer-events: none;
+  }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; align-items: center; position: relative; }
+  .hero h1 { font-size: clamp(40px, 6vw, 68px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.02; }
+  .hero h1 .hl { color: var(--solar); }
+  .hero .lead { margin: 22px 0 32px; max-width: 34em; }
+  .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+  .hero-meta { margin-top: 22px; font-size: 14px; color: var(--stone); }
+  .hero-logo { width: min(420px, 100%); height: auto; display: block; margin: 0 auto; filter: drop-shadow(0 30px 60px rgba(0,0,0,.5)); }
+  @media (max-width: 900px) {
+    .hero { padding-top: 56px; }
+    .hero-grid { grid-template-columns: 1fr; }
+    .hero-logo { width: 260px; }
+  }
+
+  /* App window illustration */
+  .window-section { padding: 24px 0 96px; }
+  .window {
+    border-radius: 14px; overflow: hidden;
+    border: 1px solid var(--border-soft);
+    background: var(--graphite);
+    box-shadow: 0 40px 120px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.02);
+    font-size: 13px;
+  }
+  .win-bar { display: flex; align-items: center; gap: 14px; height: 48px; padding: 0 16px; background: var(--smoke); border-bottom: 1px solid var(--border); }
+  .dots { display: flex; gap: 8px; }
+  .dots span { width: 12px; height: 12px; border-radius: 50%; background: var(--flint); }
+  .win-title { color: var(--bright); font-weight: 600; }
+  .win-sub { color: var(--pewter); font-size: 12px; white-space: nowrap; }
+  @media (max-width: 600px) { .chip { display: none; } .win-add { margin-left: auto; } .win-sub { display: none; } }
+  .chip { margin-left: auto; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--stone-soft); background: var(--flint); padding: 4px 10px; border-radius: 4px; }
+  .win-add { white-space: nowrap; background: var(--solar); color: var(--graphite); font-weight: 600; font-size: 12px; padding: 6px 14px; border-radius: 999px; }
+  .win-body { display: grid; grid-template-columns: 190px minmax(0, 1fr) 270px; min-height: 360px; }
+  .win-side { background: var(--smoke); border-right: 1px solid var(--border); padding: 16px 10px; }
+  .win-side .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .22em; color: var(--pewter); padding: 0 8px 6px; display: block; }
+  .win-side .item { display: flex; justify-content: space-between; padding: 6px 8px; border-radius: 6px; color: var(--mist); }
+  .win-side .item.on { background: var(--flint); color: var(--bright); }
+  .win-side .item .n { color: var(--pewter); }
+  .win-side .item .warn { color: var(--solar); font-weight: 600; }
+  .rows { overflow-x: auto; }
+  .row { display: grid; grid-template-columns: 26px minmax(170px, 1.6fr) 48px minmax(80px, 1fr) minmax(80px, 1fr); gap: 8px; padding: 9px 16px; align-items: center; color: var(--mist); }
+  .row.head { font-family: var(--mono); font-size: 10px; letter-spacing: .16em; color: var(--stone); border-bottom: 1px solid var(--border); }
+  .row .num { font-family: var(--mono); color: var(--pewter); }
+  .row .host { color: var(--bright); display: flex; gap: 6px; align-items: center; min-width: 0; }
+  .row .host span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .any { color: var(--pewter); }
+  .row.sel { background: var(--ash); }
+  .row.dim { opacity: .7; }
+  .comment { padding: 12px 16px 4px 50px; font-family: var(--mono); font-size: 11px; color: var(--stone); }
+  .badge { flex-shrink: 0; font-size: 10px; font-weight: 600; color: var(--solar); background: var(--flint); padding: 1px 6px; border-radius: 4px; }
+  .win-detail { background: var(--smoke); border-left: 1px solid var(--border); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .win-detail .e { font-family: var(--mono); font-size: 10px; letter-spacing: .22em; color: var(--amber); }
+  .win-detail .t { color: var(--bright); font-weight: 600; font-size: 15px; word-break: break-all; }
+  .notice { background: var(--ash); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .notice b { color: var(--solar); display: block; margin-bottom: 4px; font-weight: 600; }
+  .code-box { font-family: var(--mono); font-size: 11px; color: var(--stone-soft); background: var(--graphite); border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px; word-break: break-all; }
+  @media (max-width: 900px) {
+    .win-body { grid-template-columns: minmax(0, 1fr); }
+    .win-side, .win-detail { display: none; }
+  }
+  .caption { text-align: center; color: var(--stone); font-size: 14px; margin-top: 18px; }
+
+  /* Sections */
+  section.block { padding: 96px 0; border-top: 1px solid var(--border-soft); }
+  .section-head { max-width: 680px; margin-bottom: 48px; }
+  .section-head .lead { margin-top: 16px; }
+
+  .features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  .card { background: var(--smoke); border: 1px solid var(--border-soft); border-radius: 12px; padding: 26px; }
+  .card:hover { border-color: var(--flint); }
+  .card .ico { width: 40px; height: 40px; border-radius: 10px; background: var(--ash); display: grid; place-items: center; color: var(--solar); margin-bottom: 18px; }
+  .card .ico svg { width: 20px; height: 20px; }
+  .card p { margin: 10px 0 0; color: var(--pewter); font-size: 15px; line-height: 1.6; }
+  .card code { color: var(--stone-soft); font-size: 13px; }
+  @media (max-width: 900px) { .features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 600px) { .features { grid-template-columns: 1fr; } }
+
+  /* How it works */
+  .how { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 56px; align-items: center; }
+  .how ol { margin: 28px 0 0; padding: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 18px; }
+  .how li { counter-increment: s; display: grid; grid-template-columns: 36px 1fr; gap: 14px; color: var(--pewter); }
+  .how li::before {
+    content: counter(s); width: 32px; height: 32px; border-radius: 50%;
+    background: var(--solar); color: var(--graphite); font-weight: 700; font-size: 14px;
+    display: grid; place-items: center;
+  }
+  .how li strong { color: var(--bright); font-weight: 600; display: block; }
+  .tester { background: var(--graphite); border: 1px solid var(--border-soft); border-radius: 12px; overflow: hidden; font-size: 13px; }
+  .tester .q { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 16px; background: var(--smoke); border-bottom: 1px solid var(--border); }
+  .tester .q div { font-family: var(--mono); color: var(--bright); background: var(--graphite); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tester .q small { display: block; font-family: var(--sans); color: var(--stone-soft); font-size: 11px; margin-bottom: 4px; }
+  .tester .res { padding: 16px; background: var(--ash); border-bottom: 1px solid var(--border); color: var(--bright); }
+  .tester .res b { color: var(--solar); font-size: 24px; letter-spacing: -0.02em; margin-right: 8px; }
+  .t-row { display: grid; grid-template-columns: 22px minmax(0, 1.3fr) 44px minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 12px; color: var(--bright); align-items: center; }
+  .t-row:last-child { border-bottom: 0; }
+  .t-row .x { color: var(--pewter); text-decoration: line-through; }
+  .t-row .r { font-family: var(--sans); font-size: 12px; }
+  .t-row .used { background: var(--solar); color: var(--graphite); font-weight: 600; border-radius: 999px; padding: 1px 10px; justify-self: start; }
+  .t-row .skip { color: var(--amber); font-weight: 600; }
+  .t-row .no { color: var(--pewter); }
+  .t-row.win { background: var(--ash); }
+  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } }
+
+  /* Install */
+  .install { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 40px; align-items: start; }
+  pre {
+    margin: 0; background: var(--smoke); border: 1px solid var(--border-soft); border-radius: 12px;
+    padding: 22px 24px; overflow-x: auto; font-size: 14px; line-height: 1.8; color: var(--stone-soft);
+  }
+  pre .c { color: var(--stone); }
+  pre .p { color: var(--amber); user-select: none; }
+  .reqs { background: var(--smoke); border: 1px solid var(--border-soft); border-radius: 12px; padding: 24px; }
+  .reqs ul { margin: 12px 0 0; padding-left: 18px; color: var(--pewter); }
+  .reqs li { margin: 6px 0; }
+  .reqs li strong { color: var(--bright); font-weight: 600; }
+  @media (max-width: 900px) { .install { grid-template-columns: 1fr; } }
+
+  /* CTA + footer */
+  .cta { text-align: center; padding: 96px 0; border-top: 1px solid var(--border-soft); }
+  .cta img { width: 96px; height: 96px; }
+  .cta h2 { margin: 18px 0 12px; }
+  .cta .lead { margin: 0 auto 28px; max-width: 32em; }
+  .cta .hero-ctas { justify-content: center; }
+  footer { border-top: 1px solid var(--border-soft); padding: 32px 0 48px; color: var(--stone); font-size: 14px; }
+  footer .wrap { display: flex; gap: 16px 32px; flex-wrap: wrap; justify-content: space-between; }
+  footer a { color: var(--pewter); }
+  footer a:hover { color: var(--bright); }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="pgpmana home">
+      <img src="assets/logo.png" alt="" width="36" height="36">
+      pgpmana
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a class="btn" href="https://github.com/TechnotronicOz/pgpmana">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">pgpass manager for Mac</p>
+        <h1>Your <span class="hl">~/.pgpass</span>, finally easy to read.</h1>
+        <p class="lead">pgpmana is a Mac app for the PostgreSQL password file. It shows you which line psql will use and points out lines that can never match. When you save, it escapes colons for you and keeps the file at mode 0600.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-primary" href="https://github.com/TechnotronicOz/pgpmana">View on GitHub</a>
+          <a class="btn" href="#install">Build from source</a>
+        </div>
+        <p class="hero-meta">Free and open source under the MIT license. Requires macOS 14 or later.</p>
+      </div>
+      <img class="hero-logo" src="assets/logo.png" alt="pgpmana logo: a faceted blue elephant with its trunk raised" width="512" height="512">
+    </div>
+  </section>
+
+  <section class="window-section" aria-label="App preview">
+    <div class="wrap">
+      <div class="window" role="img" aria-label="Illustration of the pgpmana main window: entries in file order, one flagged as never used, and a details panel">
+        <div class="win-bar">
+          <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div>
+            <div class="win-title">~/.pgpass</div>
+            <div class="win-sub">7 entries · 2 comments</div>
+          </div>
+          <span class="chip">MODE 0600</span>
+          <span class="win-add">+ Add entry</span>
+        </div>
+        <div class="win-body">
+          <div class="win-side">
+            <span class="lbl">LIBRARY</span>
+            <div class="item on"><span>All entries</span><span>7</span></div>
+            <div class="item"><span>Uses wildcards</span><span class="n">3</span></div>
+            <div class="item"><span>Never used</span><span class="warn">1</span></div>
+            <span class="lbl" style="margin-top:16px">HOSTS</span>
+            <div class="item"><span>localhost</span></div>
+            <div class="item"><span>staging-db.example…</span></div>
+            <div class="item"><span>* (any host)</span></div>
+          </div>
+          <div class="rows">
+            <div class="row head"><span>#</span><span>HOST</span><span>PORT</span><span>DATABASE</span><span>USER</span></div>
+            <div class="comment"># local dev</div>
+            <div class="row"><span class="num">1</span><span class="host"><span>localhost</span></span><span>5432</span><span class="any">*</span><span>postgres</span></div>
+            <div class="row"><span class="num">2</span><span class="host"><span>localhost</span></span><span>5433</span><span>app_dev</span><span>app_user</span></div>
+            <div class="comment"># staging</div>
+            <div class="row sel"><span class="num">3</span><span class="host"><span>staging-db.example.internal</span></span><span>5432</span><span>orders</span><span>svc_orders</span></div>
+            <div class="row"><span class="num">4</span><span class="host"><span>staging-db.example.internal</span></span><span>5432</span><span class="any">*</span><span>readonly</span></div>
+            <div class="row"><span class="num">5</span><span class="host"><span>replica.example.internal</span></span><span>6432</span><span>analytics</span><span>matt_ro</span></div>
+            <div class="row"><span class="num">6</span><span class="host"><span class="any">*</span></span><span>5432</span><span class="any">*</span><span>postgres</span></div>
+            <div class="row dim"><span class="num">7</span><span class="host"><span>localhost</span><span class="badge">NEVER USED</span></span><span>5432</span><span>scratch</span><span>postgres</span></div>
+          </div>
+          <div class="win-detail">
+            <span class="e">ENTRY 3 OF 7</span>
+            <span class="t">svc_orders@staging-db.example.internal</span>
+            <div class="code-box">staging-db.example.internal:5432:orders:svc_orders:••••••••</div>
+            <div class="notice"><b>Entry 7 is never used</b>Entry 1 matches every connection it would, and libpq stops at the first match.</div>
+          </div>
+        </div>
+      </div>
+      <p class="caption">Illustration of the main window with sample data.</p>
+    </div>
+  </section>
+
+  <section class="block" id="features">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Features</p>
+        <h2>It reads the file the way libpq does.</h2>
+        <p class="lead">libpq uses the password from the first line that matches. A wildcard line near the top can hide more specific lines further down, and a text editor gives you no hint.</p>
+      </div>
+      <div class="features">
+        <article class="card">
+          <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><path d="M4 4l16 16"/></svg></div>
+          <h3>Finds entries that never match</h3>
+          <p>When an earlier, broader line matches everything a line would, pgpmana marks the hidden line "never used". One click moves it above the line that hides it.</p>
+        </article>
+        <article class="card">
+          <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h6"/><path d="M17 15l2 2 4-4"/></svg></div>
+          <h3>Match tester</h3>
+          <p>Type a host, port, database and user. The tester shows the entry that supplies the password, the later matches libpq skips, and the field that rules out each other line.</p>
+        </article>
+        <article class="card">
+          <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+          <h3>Saves safely</h3>
+          <p>pgpmana copies the old file to a backup first. Then it writes the new file with mode 0600 and swaps it in, so a crash can't leave you with half a file.</p>
+        </article>
+        <article class="card">
+          <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></div>
+          <h3>Permission check</h3>
+          <p>libpq ignores a password file that group or others can read. pgpmana warns you when that's the case and fixes it to <code>0600</code> in one click.</p>
+        </article>
+        <article class="card">
+          <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4l-4 8 4 8M16 4l4 8-4 8"/></svg></div>
+          <h3>Handles escaping</h3>
+          <p>A colon or backslash in a password needs a backslash in front of it. pgpmana adds them, and a preview shows the exact line before you save.</p>
+        </article>
+        <article class="card">
+          <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg></div>
+          <h3>Leaves the rest alone</h3>
+          <p>Comments, blank lines and line order stay where you put them. pgpmana writes untouched lines back byte for byte.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="how">
+    <div class="wrap how">
+      <div>
+        <p class="eyebrow">How it works</p>
+        <h2>Check a connection before psql does.</h2>
+        <ol>
+          <li><div><strong>Open your file</strong>pgpmana reads <code>~/.pgpass</code>, or the file in <code>$PGPASSFILE</code> when you launch it from a shell that sets it.</div></li>
+          <li><div><strong>Spot the problems</strong>pgpmana marks entries that an earlier wildcard hides. If the file's permissions are too open, a warning bar says so.</div></li>
+          <li><div><strong>Test a connection</strong>The match tester shows the winning entry and strikes through each field that doesn't match.</div></li>
+          <li><div><strong>Save</strong>Press ⌘S. pgpmana keeps a backup and won't overwrite the file if something else changed it after you opened it.</div></li>
+        </ol>
+      </div>
+      <div class="tester" role="img" aria-label="Illustration of the match tester: entry 1 is used, entry 7 also matches but is skipped">
+        <div class="q">
+          <div><small>Host</small>localhost</div>
+          <div><small>Port</small>5432</div>
+          <div><small>Database</small>scratch</div>
+          <div><small>User</small>postgres</div>
+        </div>
+        <div class="res"><b>Entry 1</b>supplies the password. 2 later entries also match and are skipped.</div>
+        <div class="t-row win"><span>1</span><span>localhost</span><span>5432</span><span>*</span><span class="r"><span class="used">Used</span></span></div>
+        <div class="t-row"><span>2</span><span>localhost</span><span class="x">5433</span><span class="x">app_dev</span><span class="r no">port, database, user differ</span></div>
+        <div class="t-row"><span>3</span><span class="x">staging-db…</span><span>5432</span><span class="x">orders</span><span class="r no">host, database, user differ</span></div>
+        <div class="t-row"><span>6</span><span>*</span><span>5432</span><span>*</span><span class="r skip">Matches, but entry 1 wins</span></div>
+        <div class="t-row"><span>7</span><span>localhost</span><span>5432</span><span>scratch</span><span class="r skip">Matches, but entry 1 wins</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="install">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Install</p>
+        <h2>Build it from source.</h2>
+        <p class="lead">pgpmana is a Swift package. Clone it, run the tests, and build the app bundle with one script.</p>
+      </div>
+      <div class="install">
+<pre><code><span class="c"># Get the code</span>
+<span class="p">$ </span>git clone https://github.com/TechnotronicOz/pgpmana.git
+<span class="p">$ </span>cd pgpmana
+
+<span class="c"># Optional: run the parser and matcher tests</span>
+<span class="p">$ </span>swift test
+
+<span class="c"># Build pgpmana.app and install it</span>
+<span class="p">$ </span>./scripts/bundle.sh
+<span class="p">$ </span>cp -R build/pgpmana.app ~/Applications/</code></pre>
+        <div class="reqs">
+          <p class="eyebrow" style="margin:0">Requirements</p>
+          <ul>
+            <li><strong>macOS 14</strong> (Sonoma) or later</li>
+            <li><strong>Xcode 15</strong> or later. The Command Line Tools can build the app but can't run the tests.</li>
+            <li>Not sandboxed, so it can read and write <code>~/.pgpass</code> directly</li>
+          </ul>
+          <p style="margin:16px 0 0;font-size:15px;color:var(--pewter)">Want to try it without installing? Run <code>swift run pgpmana</code> from the repo.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="wrap">
+      <img src="assets/logo.png" alt="" width="96" height="96">
+      <h2>Stop guessing which line wins.</h2>
+      <p class="lead">pgpmana is free and open source. If something breaks, open an issue.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="https://github.com/TechnotronicOz/pgpmana">Star it on GitHub</a>
+        <a class="btn" href="https://github.com/TechnotronicOz/pgpmana/issues">Report an issue</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Created by Matt Carter · <a href="mailto:carter.matt@icloud.com">carter.matt@icloud.com</a></span>
+    <span><a href="https://github.com/TechnotronicOz/pgpmana/blob/main/LICENSE">MIT License</a> · <a href="https://github.com/TechnotronicOz/pgpmana">Source on GitHub</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -29,7 +29,7 @@ struct AboutView: View {
                 }
             }
             .frame(width: 168, height: 168)
-            .accessibilityLabel("pgpmana logo: a blue elephant flexing")
+            .accessibilityLabel("pgpmana logo: a faceted blue elephant with its trunk raised")
 
             VStack(spacing: 6) {
                 Text("PGPMANA")
