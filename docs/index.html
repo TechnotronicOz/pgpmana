@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
     --graphite: #1a1a18;
@@ -99,23 +99,33 @@
   @media (max-width: 720px) { .nav-links a:not(.btn) { display: none; } }
 
   /* Hero */
-  .hero { padding: 88px 0 56px; position: relative; overflow: hidden; }
-  .hero::before {
-    content: ""; position: absolute; inset: -20% -10% auto auto; width: 720px; height: 720px;
-    background: radial-gradient(closest-side, rgba(74, 143, 224, 0.22), transparent);
-    pointer-events: none;
+  .hero { padding: 96px 0 88px; position: relative; overflow: hidden; isolation: isolate; }
+  /* Animated pgpass art fills the hero behind everything else. */
+  .hero-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    display: block; z-index: -2; opacity: .6;
+  }
+  /* Darken behind the text so it stays readable, and fade into the page below. */
+  .hero::after {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      linear-gradient(90deg, rgba(26,26,24,.92) 0%, rgba(26,26,24,.78) 38%, rgba(26,26,24,.35) 62%, rgba(26,26,24,.55) 100%),
+      linear-gradient(180deg, rgba(26,26,24,.35) 0%, rgba(26,26,24,0) 25%, rgba(26,26,24,0) 70%, var(--graphite) 100%);
   }
   .hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; align-items: center; position: relative; }
   .hero h1 { font-size: clamp(40px, 6vw, 68px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.02; }
   .hero h1 .hl { color: var(--solar); }
-  .hero .lead { margin: 22px 0 32px; max-width: 34em; }
+  .hero .lead { margin: 22px 0 32px; max-width: 34em; color: var(--mist); }
   .hero-ctas { display: flex; gap: 12px; flex-wrap: wrap; }
-  .hero-meta { margin-top: 22px; font-size: 14px; color: var(--stone); }
-  .hero-logo { width: min(420px, 100%); height: auto; display: block; margin: 0 auto; filter: drop-shadow(0 30px 60px rgba(0,0,0,.5)); }
+  .hero-meta { margin-top: 22px; font-size: 14px; color: var(--pewter); }
+  .hero-logo { width: min(420px, 100%); height: auto; display: block; margin: 0 auto; filter: drop-shadow(0 30px 60px rgba(0,0,0,.6)); }
   @media (max-width: 900px) {
     .hero { padding-top: 56px; }
     .hero-grid { grid-template-columns: 1fr; }
     .hero-logo { width: 260px; }
+    .hero::after {
+      background: linear-gradient(180deg, rgba(26,26,24,.55) 0%, rgba(26,26,24,.8) 45%, rgba(26,26,24,.9) 75%, var(--graphite) 100%);
+    }
   }
 
   /* App window illustration */
@@ -254,6 +264,7 @@
 
 <main id="top">
   <section class="hero">
+    <canvas class="hero-bg" id="pgpass-art" aria-hidden="true"></canvas>
     <div class="wrap hero-grid">
       <div>
         <p class="eyebrow">pgpass manager for Mac</p>
@@ -438,5 +449,285 @@
   </div>
 </footer>
 
+<script>
+/*
+  Hero background: the word PGPASS drawn with characters from pgpass lines.
+  Each text row stands for one entry. Every few seconds a gold scan line
+  sweeps down. The first matching row lights up gold, and a few rows below
+  it (the entries it hides) go dim. Plain canvas, no libraries.
+*/
+(function () {
+  const canvas = document.getElementById('pgpass-art');
+  if (!canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext('2d');
+  const status = document.getElementById('pgpass-status');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const WORD = 'PGPASS';
+  const LINES = [
+    'localhost:5432:*:postgres:',
+    'localhost:5433:app_dev:app_user:',
+    'staging-db:5432:orders:svc_orders:',
+    'staging-db:5432:*:readonly:',
+    'replica:6432:analytics:matt_ro:',
+    '*:5432:*:postgres:',
+    'db\\:host:5432:billing:ops:p\\:w',
+    'localhost:5432:scratch:postgres:'
+  ];
+  const STREAM = LINES.join('');
+  const SHIMMER = '0123456789abcdef:*\\.';
+  const EDGE = '.:~-';
+
+  // Elephant blues, light at the top to deep at the bottom.
+  const TOP = [140, 194, 247], BOTTOM = [47, 114, 208];
+  const GOLD = '#f2be52', AMBER = '#e8aa3c';
+
+  let W = 0, H = 0, dpr = 1, cols = 0, rows = 0, cw = 0, ch = 0, fontPx = 11;
+  let mask = null;          // per cell: 0 outside, 1 inside, 0.5 edge
+  let overrides = new Map(); // cell index -> {c, until}
+  let cycle = null;
+  let running = false, visible = true, last = 0;
+
+  function lerp(a, b, t) { return Math.round(a + (b - a) * t); }
+  function rowColor(r) {
+    const t = rows > 1 ? r / (rows - 1) : 0;
+    return 'rgb(' + lerp(TOP[0], BOTTOM[0], t) + ',' + lerp(TOP[1], BOTTOM[1], t) + ',' + lerp(TOP[2], BOTTOM[2], t) + ')';
+  }
+
+  function layout() {
+    const rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = rect.width; H = rect.height;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    fontPx = Math.max(6, Math.min(11, W / 130));
+    ctx.font = fontPx + 'px "Roboto Mono", ui-monospace, Menlo, monospace';
+    cw = ctx.measureText('M').width;
+    ch = fontPx * 1.08;
+    cols = Math.floor(W / cw);
+    rows = Math.floor(H / ch);
+    buildMask();
+    newCycle(0);
+  }
+
+  // Draw the word big on a small offscreen canvas, one pixel per 4x4 of a cell,
+  // then read how much of each cell the letters cover.
+  function buildMask() {
+    const S = 4;
+    const off = document.createElement('canvas');
+    off.width = cols * S; off.height = rows * S;
+    const o = off.getContext('2d');
+    // Each cell is about twice as tall as it is wide, but the offscreen canvas
+    // gives every cell a square of pixels. Stretch the word sideways by the cell
+    // aspect so it keeps its shape once each pixel square becomes a tall cell.
+    const CONDENSE = 0.62;           // narrower letters leave room to make them taller
+    const aspect = (ch / cw) * CONDENSE;
+    // Heavy weight and a gap between letters, so each letter reads as a block.
+    // On narrow screens the word goes on two lines.
+    const LINES_OF_WORD = W < 600 ? ['PG', 'PASS'] : [WORD];
+    const font = sz => '900 ' + sz + 'px Inter, Arial, sans-serif';
+    const gapEm = 0.1, leading = 1.0;
+    const lineWidth = (text, size) => {
+      let w = 0;
+      for (const ch of text) w += o.measureText(ch).width;
+      return w + gapEm * size * (text.length - 1);
+    };
+    let size = (rows * S * 0.95) / (LINES_OF_WORD.length * leading);
+    o.font = font(size);
+    const maxW = (cols * S * 0.94) / aspect;
+    const widest = Math.max(...LINES_OF_WORD.map(t => lineWidth(t, size)));
+    if (widest > maxW) { size *= maxW / widest; o.font = font(size); }
+    o.save();
+    o.scale(aspect, 1);
+    o.textBaseline = 'middle';
+    o.textAlign = 'left';
+    o.fillStyle = '#fff';
+    const blockH = size * leading * LINES_OF_WORD.length;
+    LINES_OF_WORD.forEach((text, li) => {
+      let x = (off.width / aspect - lineWidth(text, size)) / 2;
+      const y = (off.height - blockH) / 2 + size * leading * (li + 0.5) + size * 0.04;
+      for (const ch of text) {
+        o.fillText(ch, x, y);
+        x += o.measureText(ch).width + gapEm * size;
+      }
+    });
+    o.restore();
+    const data = o.getImageData(0, 0, off.width, off.height).data;
+    mask = new Float32Array(cols * rows);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        let sum = 0;
+        for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+          sum += data[((r * S + y) * off.width + (c * S + x)) * 4 + 3];
+        }
+        const cover = sum / (S * S * 255);
+        mask[r * cols + c] = cover > 0.6 ? 1 : cover > 0.15 ? 0.5 : 0;
+      }
+    }
+  }
+
+  // Rows that contain any lettering.
+  function letterRows() {
+    const out = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) if (mask[r * cols + c] === 1) { out.push(r); break; }
+    }
+    return out;
+  }
+
+  // One sweep: pick the matching row and the rows below it that it hides.
+  function newCycle(now) {
+    const lr = letterRows();
+    if (!lr.length) { cycle = null; return; }
+    const pick = lr[Math.floor(lr.length * (0.15 + Math.random() * 0.4))];
+    const below = lr.filter(r => r > pick + 1);
+    const hidden = new Set();
+    while (hidden.size < Math.min(3, below.length)) hidden.add(below[Math.floor(Math.random() * below.length)]);
+    cycle = { start: now, match: pick, hidden: hidden, entry: 1 + Math.floor(Math.random() * 6) };
+  }
+
+  const SWEEP = 2200, HOLD = 2600, FADE = 900, GAP = 900;
+  const PERIOD = SWEEP + HOLD + FADE + GAP;
+
+  function draw(now) {
+    if (!mask) return;
+    if (!cycle || now - cycle.start > PERIOD) newCycle(now);
+    const t = cycle ? now - cycle.start : PERIOD;
+    const scanY = Math.min(1, t / SWEEP) * H;
+    const scanning = t < SWEEP;
+    let fade = 1;
+    if (t > SWEEP + HOLD) fade = Math.max(0, 1 - (t - SWEEP - HOLD) / FADE);
+
+    if (status) {
+      const showing = cycle && scanY >= (H - rows * ch) / 2 + cycle.match * ch + ch / 2 && fade > 0.3;
+      const text = cycle ? '\u2190 first match: entry ' + (cycle.entry) : '';
+      if (status.textContent !== text) status.textContent = text;
+      status.classList.toggle('on', !!showing);
+    }
+
+    ctx.clearRect(0, 0, W, H);
+    const MONO = fontPx + 'px "Roboto Mono", ui-monospace, Menlo, monospace';
+    const MONO_BOLD = '500 ' + MONO;
+    ctx.textBaseline = 'top';
+
+    const xPad = (W - cols * cw) / 2, yPad = (H - rows * ch) / 2;
+
+    for (let r = 0; r < rows; r++) {
+      const y = yPad + r * ch;
+      const rowMid = y + ch / 2;
+      const passed = scanY >= rowMid;
+      const isMatch = cycle && r === cycle.match && passed;
+      const isHidden = cycle && cycle.hidden.has(r) && passed;
+      const near = scanning ? Math.max(0, 1 - Math.abs(rowMid - scanY) / (ch * 3)) : 0;
+      const base = rowColor(r);
+      const offset = (r * 37) % STREAM.length;
+      if (isMatch) {
+        ctx.globalAlpha = 0.14 * fade;
+        ctx.fillStyle = GOLD;
+        ctx.fillRect(0, y - 1, W, ch + 1);
+      }
+
+      for (let c = 0; c < cols; c++) {
+        const i = r * cols + c;
+        const m = mask[i];
+        const x = xPad + c * cw;
+        if (m === 0) {
+          // Faint file text behind the letters.
+          if ((r + c) % 3 === 0) {
+            ctx.font = MONO;
+            ctx.globalAlpha = 0.05;
+            ctx.fillStyle = '#b2b0ab';
+            ctx.fillText(STREAM[(offset + c) % STREAM.length], x, y);
+          }
+          continue;
+        }
+        let glyph;
+        const o = overrides.get(i);
+        if (o && o.until > now) glyph = o.c;
+        else {
+          if (o) overrides.delete(i);
+          glyph = m === 1 ? STREAM[(offset + c) % STREAM.length] : EDGE[(r + c) % EDGE.length];
+        }
+
+        let color = base, alpha = m === 1 ? 1 : 0.45;
+        if (glyph === '*') color = GOLD;
+        else if (glyph === '\\') color = AMBER;
+        if (isMatch) { color = GOLD; alpha = 0.6 + 0.4 * fade; }
+        else if (isHidden) { alpha = alpha * (0.25 + 0.75 * (1 - fade)); }
+        if (near > 0) alpha = Math.min(1, alpha + near * 0.5);
+
+        ctx.font = m === 1 ? MONO_BOLD : MONO;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = color;
+        ctx.fillText(glyph, x, y);
+      }
+
+    }
+
+    // The scan line itself.
+    if (scanning) {
+      const g = ctx.createLinearGradient(0, scanY - ch * 2, 0, scanY);
+      g.addColorStop(0, 'rgba(242,190,82,0)');
+      g.addColorStop(1, 'rgba(242,190,82,0.12)');
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = g;
+      ctx.fillRect(0, scanY - ch * 2, W, ch * 2);
+      ctx.fillStyle = 'rgba(242,190,82,0.85)';
+      ctx.fillRect(0, scanY - 1, W, 1);
+    }
+    ctx.globalAlpha = 1;
+
+    // Shimmer: swap a few letter cells for random characters briefly.
+    if (!reduceMotion) {
+      for (let k = 0; k < Math.ceil(cols * rows / 900); k++) {
+        const i = Math.floor(Math.random() * mask.length);
+        if (mask[i] === 1) overrides.set(i, { c: SHIMMER[Math.floor(Math.random() * SHIMMER.length)], until: now + 250 + Math.random() * 500 });
+      }
+    }
+  }
+
+  function frame(now) {
+    if (!running) return;
+    if (now - last > 33) { draw(now); last = now; }
+    requestAnimationFrame(frame);
+  }
+  function start() { if (!running && visible && !reduceMotion) { running = true; requestAnimationFrame(frame); } }
+  function stop() { running = false; }
+
+  function init() {
+    layout();
+    if (reduceMotion) {
+      // One still frame, caught just after the match lights up.
+      if (cycle) { cycle.start = 0; draw(SWEEP + 400); }
+      return;
+    }
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(entries => {
+        visible = entries[0].isIntersecting;
+        visible ? start() : stop();
+      }).observe(canvas);
+    }
+    document.addEventListener('visibilitychange', () => document.hidden ? stop() : start());
+    start();
+  }
+
+  let resizeTimer, lastSize = '';
+  const relayout = () => {
+    const r = canvas.getBoundingClientRect();
+    const key = Math.round(r.width) + 'x' + Math.round(r.height);
+    if (key === lastSize) return;
+    lastSize = key;
+    layout();
+    if (reduceMotion && cycle) { cycle.start = 0; draw(SWEEP + 400); }
+  };
+  const onResize = () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(relayout, 150); };
+  if ('ResizeObserver' in window) new ResizeObserver(onResize).observe(canvas);
+  else window.addEventListener('resize', onResize);
+
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(init);
+})();
+</script>
 </body>
 </html>
