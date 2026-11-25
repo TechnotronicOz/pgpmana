@@ -13,15 +13,23 @@ enum EditorRequest: Identifiable {
     }
 }
 
+struct ConnectionTestRequest: Identifiable {
+    let id = UUID()
+    let entry: PgpassEntry
+}
+
 struct ContentView: View {
     @Environment(PgpassStore.self) private var store
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.undoManager) private var undoManager
 
     @State private var filter: SidebarFilter = .all
     @State private var selection: PgpassLine.ID?
     @State private var editor: EditorRequest?
     @State private var showInspector = true
     @State private var showAbout = false
+    @State private var showFixOrder = false
+    @State private var connectionTest: ConnectionTestRequest?
 
     var body: some View {
         NavigationSplitView {
@@ -49,13 +57,24 @@ struct ContentView: View {
                             .buttonStyle(PillButtonStyle(kind: .primary, compact: true))
                     }
                 }
+                if let notice = store.notice {
+                    Banner(systemImage: "arrow.clockwise", message: notice) {
+                        Button("Dismiss") { store.notice = nil }
+                            .buttonStyle(PillButtonStyle(kind: .secondary, compact: true))
+                    }
+                }
                 if let message = store.errorMessage {
                     Banner(systemImage: "xmark.octagon", message: message) {
                         Button("Dismiss") { store.errorMessage = nil }
                             .buttonStyle(PillButtonStyle(kind: .secondary, compact: true))
                     }
                 }
-                EntryListView(filter: filter, selection: $selection) { editor = .edit($0) }
+                EntryListView(
+                    filter: filter,
+                    selection: $selection,
+                    onEdit: { editor = .edit($0) },
+                    onTest: testConnection
+                )
             }
             .background(Theme.graphite)
             .inspector(isPresented: $showInspector) {
@@ -77,6 +96,9 @@ struct ContentView: View {
                 Button { store.save() } label: { Label("Save", systemImage: "square.and.arrow.down") }
                     .help("Save to \(store.displayPath) (⌘S)")
                     .disabled(!store.isDirty)
+                Button { showFixOrder = true } label: { Label("Fix Order", systemImage: "arrow.up.arrow.down") }
+                    .help(store.shadowMap.isEmpty ? "No entries are hidden" : "Reorder so no entry is hidden (⌥⌘F)")
+                    .disabled(store.shadowMap.isEmpty)
                 Button { openWindow(id: "match-tester") } label: { Label("Match Tester", systemImage: "text.alignleft") }
                     .help("See which entry a connection would use (⇧⌘T)")
                 Button { editor = .add } label: {
@@ -102,6 +124,24 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .pgpmanaShowAbout)) { _ in
             showAbout = true
         }
+        .sheet(isPresented: $showFixOrder) {
+            FixOrderSheet()
+                .environment(store)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pgpmanaFixOrder)) { _ in
+            if !store.shadowMap.isEmpty { showFixOrder = true }
+        }
+        .sheet(item: $connectionTest) { request in
+            ConnectionTestSheet(entry: request.entry)
+        }
+        .onAppear { store.undoManager = undoManager }
+        .onChange(of: undoManager) { _, newValue in store.undoManager = newValue }
+    }
+
+    private func testConnection(_ id: PgpassLine.ID) {
+        if let entry = store.line(id)?.entry {
+            connectionTest = ConnectionTestRequest(entry: entry)
+        }
     }
 
     @ViewBuilder
@@ -110,6 +150,8 @@ struct ContentView: View {
             EntryDetailView(
                 lineID: id,
                 onEdit: { editor = .edit(id) },
+                onTest: { testConnection(id) },
+                onFixOrder: { showFixOrder = true },
                 onSelect: { selection = $0 }
             )
         } else {

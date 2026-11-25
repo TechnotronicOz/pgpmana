@@ -1,6 +1,6 @@
 # pgpmana
 
-pgpmana is a small Mac app for your PostgreSQL password file. It edits `~/.pgpass`, or the file in `$PGPASSFILE` if you set one.
+Stop counting colons. pgpmana is a small Mac app that shows each entry in your PostgreSQL password file as labeled fields: host, port, database, user and password. It edits `~/.pgpass`, or the file in `$PGPASSFILE` if you set one.
 
 Website: https://technotronicoz.github.io/pgpmana/
 
@@ -10,8 +10,41 @@ Website: https://technotronicoz.github.io/pgpmana/
 - Marks entries that never get used. libpq stops at the first line that matches. An earlier line can match every connection a later line would, and then the later line never wins.
 - Adds and edits entries. Each field has an "Any (*)" box, and a preview shows the exact line pgpmana will write, escapes included.
 - Lets you drag entries to reorder them.
+- Fixes the order for you. "Fix order" (⌥⌘F) moves each hidden entry directly above the entry that hides it, and shows every move before it applies them. It also finds exact duplicates and can remove them.
+- Fills in a new entry from a connection URL such as `postgres://user:password@host:5432/database`. If the clipboard holds one when you add an entry, pgpmana puts it in the URL field for you.
+- Tests a connection. With `psql` installed, pgpmana logs in using only that entry's password, so a stale password shows up. With only `pg_isready`, it checks that the server is up, but it can't check the password.
 - Has a Match Tester window (⇧⌘T). Type a host, port, database and user, and it shows which entry libpq would pick.
 - Warns you when group or others can read the file, because libpq ignores the file then. One click sets it to 0600.
+
+## Keyboard shortcuts
+
+| Action | Shortcut |
+| --- | --- |
+| Add entry | ⌘N |
+| Edit the selected entry | ↩ |
+| Test connection | ⌘K |
+| Copy password | ⇧⌘C |
+| Copy psql command | ⌥⌘C |
+| Duplicate | ⌘D |
+| Delete the selected entry | ⌫ |
+| Fix order | ⌥⌘F |
+| Save | ⌘S |
+| Undo, redo | ⌘Z, ⇧⌘Z |
+| Match Tester | ⇧⌘T |
+
+The actions also sit in the bar at the bottom of the details panel. Hover over an icon to see its name and shortcut.
+
+## Undo and outside changes
+
+⌘Z undoes any change and ⇧⌘Z redoes it. A whole drag or a "Fix order" counts as one step.
+
+pgpmana watches the file. If another program changes it and you have no unsaved changes, pgpmana reloads it and tells you. If you have unsaved changes, it keeps them and asks if you want to reload or overwrite.
+
+## Testing connections
+
+pgpmana looks for `psql` and `pg_isready` on your PATH and in the usual install places: Homebrew (including the keg-only `libpq` and `postgresql@N` formulas), Postgres.app and the EDB installer. Run `brew install libpq` if you have neither.
+
+For the test, pgpmana writes a one-line password file holding only the entry under test, with mode 0600 in a private temp folder. It points `PGPASSFILE` at that file, unsets `PGPASSWORD`, runs `psql -X -w -c "select version()"` with a 5-second connect timeout, and deletes the file afterwards. Entries with `*` fields ask you for real values first.
 
 ## Saving
 

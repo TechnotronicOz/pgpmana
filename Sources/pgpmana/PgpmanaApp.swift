@@ -4,6 +4,7 @@ import AppKit
 extension Notification.Name {
     static let pgpmanaAddEntry = Notification.Name("pgpmanaAddEntry")
     static let pgpmanaShowAbout = Notification.Name("pgpmanaShowAbout")
+    static let pgpmanaFixOrder = Notification.Name("pgpmanaFixOrder")
 }
 
 @main
@@ -35,6 +36,14 @@ struct PgpmanaApp: App {
                     NotificationCenter.default.post(name: .pgpmanaAddEntry, object: nil)
                 }
                 .keyboardShortcut("n")
+            }
+            CommandGroup(after: .pasteboard) {
+                Divider()
+                Button("Fix Order…") {
+                    NotificationCenter.default.post(name: .pgpmanaFixOrder, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: [.command, .option])
+                .disabled(store.shadowMap.isEmpty)
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Save") { store.save() }

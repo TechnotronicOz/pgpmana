@@ -6,6 +6,8 @@ struct EntryDetailView: View {
     @Environment(PgpassStore.self) private var store
     let lineID: PgpassLine.ID
     var onEdit: () -> Void
+    var onTest: () -> Void
+    var onFixOrder: () -> Void
     var onSelect: (PgpassLine.ID?) -> Void
 
     @State private var reveal = false
@@ -30,10 +32,14 @@ struct EntryDetailView: View {
                             title: "This entry is never used",
                             message: "Entry \(number) matches every connection this one would, and libpq stops at the first match."
                         ) {
-                            Button("Move above entry \(number)") {
-                                store.move(lineID, above: shadowingID)
+                            HStack(spacing: 8) {
+                                Button("Move above entry \(number)") {
+                                    store.move(lineID, above: shadowingID)
+                                }
+                                .buttonStyle(PillButtonStyle(kind: .secondary, compact: true))
+                                Button("Fix order…", action: onFixOrder)
+                                    .buttonStyle(PillButtonStyle(kind: .secondary, compact: true))
                             }
-                            .buttonStyle(PillButtonStyle(kind: .secondary, compact: true))
                         }
                     }
 
@@ -73,32 +79,48 @@ struct EntryDetailView: View {
                         }
                     }
 
-                    FlowLayout(spacing: 8) {
-                        Button("Edit", action: onEdit)
-                            .buttonStyle(.pill)
-                        Button(copied == "password" ? "Copied" : "Copy password") {
-                            copy(entry.password, tag: "password")
-                        }
-                        .buttonStyle(.pill)
-                        Button(copied == "psql" ? "Copied" : "Copy psql command") {
-                            copy(PsqlCommand.make(for: entry), tag: "psql")
-                        }
-                        .buttonStyle(.pill)
-                        Button("Duplicate") { onSelect(store.duplicate(lineID)) }
-                            .buttonStyle(.pill)
-                        Button("Delete") {
-                            store.delete(lineID)
-                            onSelect(nil)
-                        }
-                        .buttonStyle(.pill)
-                    }
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                actionBar(entry)
+            }
             .onChange(of: lineID) {
                 reveal = false
                 copied = nil
+            }
+        }
+    }
+
+    /// Change it, check it, copy it, then Duplicate, with Delete apart on the right.
+    private func actionBar(_ entry: PgpassEntry) -> some View {
+        InspectorActionBar {
+            ActionIconButton(systemImage: "pencil", label: "Edit entry", keys: "↩", tipAlignment: .leading, action: onEdit)
+            ActionIconButton(systemImage: "bolt", label: "Test connection", keys: "⌘K",
+                             shortcut: KeyboardShortcut("k", modifiers: .command), action: onTest)
+            ActionBarDivider()
+            ActionIconButton(systemImage: "key", label: copied == "password" ? "Password copied" : "Copy password", keys: "⇧⌘C",
+                             shortcut: KeyboardShortcut("c", modifiers: [.command, .shift]),
+                             confirmed: copied == "password") {
+                copy(entry.password, tag: "password")
+            }
+            ActionIconButton(systemImage: "terminal", label: copied == "psql" ? "psql command copied" : "Copy psql command", keys: "⌥⌘C",
+                             shortcut: KeyboardShortcut("c", modifiers: [.command, .option]),
+                             confirmed: copied == "psql") {
+                copy(PsqlCommand.make(for: entry), tag: "psql")
+            }
+            ActionBarDivider()
+            ActionIconButton(systemImage: "plus.square.on.square", label: "Duplicate", keys: "⌘D",
+                             shortcut: KeyboardShortcut("d", modifiers: .command)) {
+                onSelect(store.duplicate(lineID))
+            }
+            Spacer(minLength: 0)
+            // No shortcut here: ⌫ in the list already deletes, and a bare ⌫
+            // shortcut would fire while typing in the search field.
+            ActionIconButton(systemImage: "trash", label: "Delete entry", keys: "⌫", danger: true, tipAlignment: .trailing) {
+                store.delete(lineID)
+                onSelect(nil)
             }
         }
     }

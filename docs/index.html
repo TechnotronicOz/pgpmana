@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>pgpmana: a native Mac app for your ~/.pgpass</title>
-<meta name="description" content="pgpmana is a free, open source Mac app for your PostgreSQL password file. It shows which line libpq will use and warns you about lines that can never match.">
-<meta property="og:title" content="pgpmana: a native Mac app for your ~/.pgpass">
-<meta property="og:description" content="A free Mac app for your PostgreSQL password file. It shows which line libpq will use and warns you about lines that can never match.">
+<title>pgpmana: stop counting colons in your ~/.pgpass</title>
+<meta name="description" content="Stop counting colons. pgpmana is a free, open source Mac app that shows every entry in your PostgreSQL password file as labeled fields, fixes lines that can never match, and tests logins with psql.">
+<meta property="og:title" content="pgpmana: stop counting colons in your ~/.pgpass">
+<meta property="og:description" content="A free Mac app that shows every ~/.pgpass entry as labeled fields: host, port, database, user and password.">
 <meta property="og:image" content="https://technotronicoz.github.io/pgpmana/assets/social-card.png">
 <meta property="og:url" content="https://technotronicoz.github.io/pgpmana/">
 <meta name="twitter:card" content="summary_large_image">
@@ -130,6 +130,8 @@
 
   /* App window illustration */
   .window-section { padding: 24px 0 96px; }
+  .shot { display: block; width: 100%; height: auto; max-width: 1180px; margin: 0 auto; }
+  .window-section .caption { margin-top: -28px; position: relative; }
   .window {
     border-radius: 14px; overflow: hidden;
     border: 1px solid var(--border-soft);
@@ -269,7 +271,7 @@
       <div>
         <p class="eyebrow">pgpass manager for Mac</p>
         <h1>Your <span class="hl">~/.pgpass</span>, finally easy to read.</h1>
-        <p class="lead">pgpmana is a Mac app for the PostgreSQL password file. It shows you which line psql will use and points out lines that can never match. When you save, it escapes colons for you and keeps the file at mode 0600.</p>
+        <p class="lead">pgpmana shows each entry in your PostgreSQL password file as labeled fields: host, port, database, user and password, with no colons to count. It also points out lines that can never match, and when you save, it handles the escaping and keeps the file at mode 0600.</p>
         <div class="hero-ctas">
           <a class="btn btn-primary" href="https://github.com/TechnotronicOz/pgpmana">View on GitHub</a>
           <a class="btn" href="#install">Build from source</a>
@@ -282,48 +284,9 @@
 
   <section class="window-section" aria-label="App preview">
     <div class="wrap">
-      <div class="window" role="img" aria-label="Illustration of the pgpmana main window: entries in file order, one flagged as never used, and a details panel">
-        <div class="win-bar">
-          <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
-          <div>
-            <div class="win-title">~/.pgpass</div>
-            <div class="win-sub">7 entries · 2 comments</div>
-          </div>
-          <span class="chip">MODE 0600</span>
-          <span class="win-add">+ Add entry</span>
-        </div>
-        <div class="win-body">
-          <div class="win-side">
-            <span class="lbl">LIBRARY</span>
-            <div class="item on"><span>All entries</span><span>7</span></div>
-            <div class="item"><span>Uses wildcards</span><span class="n">3</span></div>
-            <div class="item"><span>Never used</span><span class="warn">1</span></div>
-            <span class="lbl" style="margin-top:16px">HOSTS</span>
-            <div class="item"><span>localhost</span></div>
-            <div class="item"><span>staging-db.example…</span></div>
-            <div class="item"><span>* (any host)</span></div>
-          </div>
-          <div class="rows">
-            <div class="row head"><span>#</span><span>HOST</span><span>PORT</span><span>DATABASE</span><span>USER</span></div>
-            <div class="comment"># local dev</div>
-            <div class="row"><span class="num">1</span><span class="host"><span>localhost</span></span><span>5432</span><span class="any">*</span><span>postgres</span></div>
-            <div class="row"><span class="num">2</span><span class="host"><span>localhost</span></span><span>5433</span><span>app_dev</span><span>app_user</span></div>
-            <div class="comment"># staging</div>
-            <div class="row sel"><span class="num">3</span><span class="host"><span>staging-db.example.internal</span></span><span>5432</span><span>orders</span><span>svc_orders</span></div>
-            <div class="row"><span class="num">4</span><span class="host"><span>staging-db.example.internal</span></span><span>5432</span><span class="any">*</span><span>readonly</span></div>
-            <div class="row"><span class="num">5</span><span class="host"><span>replica.example.internal</span></span><span>6432</span><span>analytics</span><span>matt_ro</span></div>
-            <div class="row"><span class="num">6</span><span class="host"><span class="any">*</span></span><span>5432</span><span class="any">*</span><span>postgres</span></div>
-            <div class="row dim"><span class="num">7</span><span class="host"><span>localhost</span><span class="badge">NEVER USED</span></span><span>5432</span><span>scratch</span><span>postgres</span></div>
-          </div>
-          <div class="win-detail">
-            <span class="e">ENTRY 3 OF 7</span>
-            <span class="t">svc_orders@staging-db.example.internal</span>
-            <div class="code-box">staging-db.example.internal:5432:orders:svc_orders:••••••••</div>
-            <div class="notice"><b>Entry 7 is never used</b>Entry 1 matches every connection it would, and libpq stops at the first match.</div>
-          </div>
-        </div>
-      </div>
-      <p class="caption">Illustration of the main window with sample data.</p>
+      <img class="shot" src="assets/screenshot-main.png" width="1360" height="890" loading="lazy"
+           alt="The pgpmana window with seven sample entries. Entry 7 is marked never used, entry 3 is open in the details panel, and the action bar at the bottom shows the tooltip Copy psql command.">
+      <p class="caption">pgpmana with the demo file from the repo. Entry 7 never gets used, because entry 1 matches everything it would.</p>
     </div>
   </section>
 
@@ -341,6 +304,16 @@
           <p>When an earlier, broader line matches everything a line would, pgpmana marks the hidden line "never used". One click moves it above the line that hides it.</p>
         </article>
         <article class="card">
+          <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M7 4l-3 3M7 4l3 3"/><path d="M17 20V4M17 20l-3-3M17 20l3-3"/></svg></div>
+          <h3>Fixes the order</h3>
+          <p>One click moves each hidden entry directly above the entry that hides it. A preview lists every move first, and exact duplicates get their own "remove" button.</p>
+        </article>
+        <article class="card">
+          <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div>
+          <h3>Tests the login</h3>
+          <p>If <code>psql</code> is installed, pgpmana logs in with that one entry's password, so a password that was rotated and never updated shows up right away.</p>
+        </article>
+        <article class="card">
           <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h6"/><path d="M17 15l2 2 4-4"/></svg></div>
           <h3>Match tester</h3>
           <p>Type a host, port, database and user. The tester shows the entry that supplies the password, the later matches libpq skips, and the field that rules out each other line.</p>
@@ -348,7 +321,7 @@
         <article class="card">
           <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
           <h3>Saves safely</h3>
-          <p>pgpmana copies the old file to a backup first. Then it writes the new file with mode 0600 and swaps it in, so a crash can't leave you with half a file.</p>
+          <p>pgpmana backs up the old file, then writes the new one with mode 0600 and swaps it in. ⌘Z undoes any change, and if another app edits the file, pgpmana reloads it.</p>
         </article>
         <article class="card">
           <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg></div>
@@ -356,14 +329,19 @@
           <p>libpq ignores a password file that group or others can read. pgpmana warns you when that's the case and fixes it to <code>0600</code> in one click.</p>
         </article>
         <article class="card">
-          <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4l-4 8 4 8M16 4l4 8-4 8"/></svg></div>
-          <h3>Handles escaping</h3>
-          <p>A colon or backslash in a password needs a backslash in front of it. pgpmana adds them, and a preview shows the exact line before you save.</p>
+          <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1"/><path d="M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/></svg></div>
+          <h3>Paste a connection URL</h3>
+          <p>Paste <code>postgres://user:pass@host:5432/db</code> and pgpmana fills in a new entry, with the escaping done for you.</p>
         </article>
         <article class="card">
           <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></svg></div>
           <h3>Leaves the rest alone</h3>
           <p>Comments, blank lines and line order stay where you put them. pgpmana writes untouched lines back byte for byte.</p>
+        </article>
+        <article class="card">
+          <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></div>
+          <h3>Keyboard friendly</h3>
+          <p>⌘K tests a connection, ⇧⌘C copies the password and ⌥⌘F fixes the order. Hover any icon in the action bar to see its shortcut.</p>
         </article>
       </div>
     </div>
@@ -376,8 +354,8 @@
         <h2>Check a connection before psql does.</h2>
         <ol>
           <li><div><strong>Open your file</strong>pgpmana reads <code>~/.pgpass</code>, or the file in <code>$PGPASSFILE</code> when you launch it from a shell that sets it.</div></li>
-          <li><div><strong>Spot the problems</strong>pgpmana marks entries that an earlier wildcard hides. If the file's permissions are too open, a warning bar says so.</div></li>
-          <li><div><strong>Test a connection</strong>The match tester shows the winning entry and strikes through each field that doesn't match.</div></li>
+          <li><div><strong>Spot and fix the problems</strong>pgpmana marks entries that an earlier wildcard hides, and Fix order moves them where they'll match. If the file's permissions are too open, a warning bar says so.</div></li>
+          <li><div><strong>Test a connection</strong>The match tester shows the winning entry and strikes through each field that doesn't match. Test connection then logs in with <code>psql</code> to prove the password still works.</div></li>
           <li><div><strong>Save</strong>Press ⌘S. pgpmana keeps a backup and won't overwrite the file if something else changed it after you opened it.</div></li>
         </ol>
       </div>
@@ -422,8 +400,9 @@
             <li><strong>macOS 14</strong> (Sonoma) or later</li>
             <li><strong>Xcode 15</strong> or later. The Command Line Tools can build the app but can't run the tests.</li>
             <li>Not sandboxed, so it can read and write <code>~/.pgpass</code> directly</li>
+            <li>Optional: <code>psql</code> for connection tests. <code>brew install libpq</code> provides it. Everything else works without it.</li>
           </ul>
-          <p style="margin:16px 0 0;font-size:15px;color:var(--pewter)">Want to try it without installing? Run <code>swift run pgpmana</code> from the repo.</p>
+          <p style="margin:16px 0 0;font-size:15px;color:var(--pewter)">Want to try it without touching your own file? From the repo, run <code>chmod 600 Design/demo.pgpass</code>, then <code>PGPASSFILE="$PWD/Design/demo.pgpass" swift run pgpmana</code>.</p>
         </div>
       </div>
     </div>
@@ -432,8 +411,8 @@
   <section class="cta">
     <div class="wrap">
       <img src="assets/logo.png" alt="" width="96" height="96">
-      <h2>Stop guessing which line wins.</h2>
-      <p class="lead">pgpmana is free and open source. If something breaks, open an issue.</p>
+      <h2>Stop counting colons.</h2>
+      <p class="lead">pgpmana opens the hidden file and shows every entry as labeled fields, so you never have to work out which colon is which. It's free and open source.</p>
       <div class="hero-ctas">
         <a class="btn btn-primary" href="https://github.com/TechnotronicOz/pgpmana">Star it on GitHub</a>
         <a class="btn" href="https://github.com/TechnotronicOz/pgpmana/issues">Report an issue</a>

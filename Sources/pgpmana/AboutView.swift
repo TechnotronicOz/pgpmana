@@ -36,7 +36,7 @@ struct AboutView: View {
                     .font(Theme.sans(28, .bold))
                     .tracking(-0.3)
                     .foregroundStyle(Theme.brightWhite)
-                Eyebrow("pgpass manager for Mac", color: Theme.pewter)
+                Eyebrow("Stop counting colons", color: Theme.pewter)
                 Text(versionText)
                     .font(Theme.mono(11))
                     .foregroundStyle(Theme.pewter)

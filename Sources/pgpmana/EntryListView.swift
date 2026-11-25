@@ -20,6 +20,7 @@ struct EntryListView: View {
     let filter: SidebarFilter
     @Binding var selection: PgpassLine.ID?
     var onEdit: (PgpassLine.ID) -> Void
+    var onTest: (PgpassLine.ID) -> Void
 
     @State private var search = ""
     @State private var dragging: PgpassLine.ID?
@@ -134,6 +135,7 @@ struct EntryListView: View {
     private func contextMenu(for line: PgpassLine) -> some View {
         if line.entry != nil {
             Button("Edit…") { onEdit(line.id) }
+            Button("Test Connection…") { onTest(line.id) }
             Button("Duplicate") { selection = store.duplicate(line.id) }
             Divider()
             Button("Delete", role: .destructive) {
@@ -200,6 +202,7 @@ private struct Reorderable: ViewModifier {
             content
                 .onDrag {
                     dragging = lineID
+                    store.beginDrag()
                     return NSItemProvider(object: lineID.uuidString as NSString)
                 }
                 .onDrop(of: [.plainText, .text], delegate: RowDropDelegate(target: lineID, dragging: $dragging, store: store))
@@ -228,6 +231,7 @@ private struct RowDropDelegate: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         dragging = nil
+        store.endDrag()
         return true
     }
 }

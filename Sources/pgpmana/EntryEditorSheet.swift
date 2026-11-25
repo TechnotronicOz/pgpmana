@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import PgpassKit
 
 struct EntryEditorSheet: View {
@@ -21,6 +22,9 @@ struct EntryEditorSheet: View {
     @State private var anyUser = false
     @State private var showPassword = false
     @State private var position: InsertPosition = .bottom
+    @State private var urlText = ""
+    @State private var urlMessage: String?
+    @State private var urlFromClipboard = false
 
     private var editingID: PgpassLine.ID? {
         if case .edit(let id) = request { return id }
@@ -62,6 +66,8 @@ struct EntryEditorSheet: View {
                     .font(Theme.sans(20, .semibold))
                     .foregroundStyle(Theme.brightWhite)
             }
+
+            urlRow
 
             VStack(spacing: 12) {
                 matchField("Host", text: $host, any: $anyHost)
@@ -188,7 +194,59 @@ struct EntryEditorSheet: View {
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 
+    /// Paste a postgres:// URL and fill in every field from it.
+    private var urlRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Eyebrow("Fill from a connection URL", color: Theme.pewter)
+            HStack(spacing: 8) {
+                TextField("Connection URL", text: $urlText, prompt: Text("postgres://user:password@host:5432/database").foregroundColor(Theme.stone))
+                    .labelsHidden()
+                    .themedField(mono: true)
+                    .onSubmit(fillFromURL)
+                Button("Fill", action: fillFromURL)
+                    .buttonStyle(.pill)
+                    .disabled(urlText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            if let urlMessage {
+                Text(urlMessage)
+                    .font(Theme.sans(12))
+                    .foregroundStyle(Theme.pewter)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if urlFromClipboard {
+                Text("Found a connection URL on the clipboard. Press Fill to use it.")
+                    .font(Theme.sans(12))
+                    .foregroundStyle(Theme.pewter)
+            }
+        }
+    }
+
+    private func fillFromURL() {
+        do {
+            let e = try ConnectionURL.parse(urlText)
+            anyHost = false
+            anyPort = false
+            anyDatabase = false
+            anyUser = false
+            host = e.host
+            port = e.port
+            database = e.database
+            username = e.username
+            password = e.password
+            urlText = ""
+            urlFromClipboard = false
+            urlMessage = "Filled in from the URL. Check the fields, then save."
+        } catch {
+            urlMessage = error.localizedDescription
+        }
+    }
+
     private func load() {
+        if editingID == nil,
+           let clip = NSPasteboard.general.string(forType: .string),
+           ConnectionURL.looksLikeURL(clip) {
+            urlText = clip.trimmingCharacters(in: .whitespacesAndNewlines)
+            urlFromClipboard = true
+        }
         guard let id = editingID, let entry = store.line(id)?.entry else { return }
         anyHost = entry.host == "*"
         anyPort = entry.port == "*"

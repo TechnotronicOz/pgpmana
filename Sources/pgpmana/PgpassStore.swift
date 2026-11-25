@@ -22,20 +22,35 @@ final class PgpassStore {
     private(set) var url: URL
     private(set) var lines: [PgpassLine] = []
     private(set) var mode: Int?
-    private(set) var isDirty = false
     private(set) var lastSaved: Date?
-    /// The file changed on disk after we read it.
+    /// The file changed on disk while there were unsaved changes here.
     private(set) var changedOnDisk = false
     var errorMessage: String?
+    /// A short message that clears itself, such as "reloaded from disk".
+    var notice: String?
 
+    /// The lines as last read from or written to disk.
+    private var savedLines: [PgpassLine] = []
     private var loadedModificationDate: Date?
+
+    /// The window's undo manager, so ⌘Z and ⇧⌘Z work. ContentView sets it.
+    @ObservationIgnored weak var undoManager: UndoManager?
+    @ObservationIgnored private var dragSnapshot: [PgpassLine]?
+    @ObservationIgnored private var watcher: FileWatcher?
+    @ObservationIgnored private var pendingDiskCheck: DispatchWorkItem?
+    @ObservationIgnored private var noticeTimer: DispatchWorkItem?
 
     init(url: URL = PgpassFile.defaultLocation()) {
         self.url = url
         reload()
+        watcher = FileWatcher(url: url) { [weak self] in
+            MainActor.assumeIsolated { self?.fileChangedOnDisk() }
+        }
     }
 
     // MARK: Derived state
+
+    var isDirty: Bool { lines != savedLines }
 
     var fileExists: Bool { FileManager.default.fileExists(atPath: url.path) }
 
@@ -67,6 +82,9 @@ final class PgpassStore {
         return map
     }
 
+    /// What "Fix order" would do to the current lines.
+    var orderFix: OrderFix { PgpassOrderFixer.fix(lines) }
+
     func line(_ id: PgpassLine.ID) -> PgpassLine? {
         lines.first { $0.id == id }
     }
@@ -81,11 +99,13 @@ final class PgpassStore {
     func reload() {
         do {
             lines = try PgpassFile.read(at: url)
+            savedLines = lines
             mode = PgpassFile.posixMode(at: url)
             loadedModificationDate = PgpassFile.modificationDate(at: url)
-            isDirty = false
             changedOnDisk = false
             errorMessage = nil
+            // Undo steps refer to lines that no longer exist.
+            undoManager?.removeAllActions(withTarget: self)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -94,15 +114,16 @@ final class PgpassStore {
     /// Saves unless the file changed on disk since it was read; pass
     /// `overwrite: true` to save anyway.
     func save(overwrite: Bool = false) {
+        endDrag()
         if !overwrite, fileExists, PgpassFile.modificationDate(at: url) != loadedModificationDate {
             changedOnDisk = true
             return
         }
         do {
             try PgpassFile.write(lines, to: url)
+            savedLines = lines
             mode = PgpassFile.posixMode(at: url)
             loadedModificationDate = PgpassFile.modificationDate(at: url)
-            isDirty = false
             changedOnDisk = false
             lastSaved = Date()
             errorMessage = nil
@@ -121,58 +142,158 @@ final class PgpassStore {
         }
     }
 
+    func showNotice(_ text: String) {
+        notice = text
+        noticeTimer?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                if self?.notice == text { self?.notice = nil }
+            }
+        }
+        noticeTimer = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: work)
+    }
+
+    // MARK: Changes made outside the app
+
+    /// Called by the watcher. Waits a moment, because editors often write a
+    /// file in several steps.
+    private func fileChangedOnDisk() {
+        pendingDiskCheck?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.checkDisk() }
+        }
+        pendingDiskCheck = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+    }
+
+    private func checkDisk() {
+        mode = PgpassFile.posixMode(at: url)
+        // Our own save, or only the permissions changed.
+        guard PgpassFile.modificationDate(at: url) != loadedModificationDate else { return }
+
+        if isDirty {
+            // Don't throw away edits. The banner offers Reload or Overwrite.
+            changedOnDisk = true
+            return
+        }
+        let existed = !lines.isEmpty || loadedModificationDate != nil
+        reload()
+        if fileExists {
+            showNotice("\(displayPath) changed outside pgpmana, so it was reloaded.")
+        } else if existed {
+            showNotice("\(displayPath) was deleted outside pgpmana.")
+        }
+    }
+
+    // MARK: Undo
+
+    /// Applies `body` to the lines and registers one undo step for it.
+    private func change(_ actionName: String, _ body: (inout [PgpassLine]) -> Void) {
+        // A drag dropped outside the list never calls endDrag. File its step now.
+        endDrag()
+        let before = lines
+        body(&lines)
+        guard lines != before else { return }
+        registerUndo(actionName, restoring: before)
+    }
+
+    /// Undoing puts `snapshot` back and registers the opposite step, which
+    /// UndoManager files under Redo.
+    private func registerUndo(_ actionName: String, restoring snapshot: [PgpassLine]) {
+        guard let undoManager else { return }
+        undoManager.registerUndo(withTarget: self) { store in
+            MainActor.assumeIsolated {
+                let current = store.lines
+                store.lines = snapshot
+                store.registerUndo(actionName, restoring: current)
+            }
+        }
+        undoManager.setActionName(actionName)
+    }
+
     // MARK: Editing
 
     @discardableResult
     func add(_ entry: PgpassEntry, at position: InsertPosition) -> PgpassLine.ID {
         let line = PgpassLine(kind: .entry(entry))
-        lines.insert(line, at: Self.insertionIndex(for: position, in: lines))
-        isDirty = true
+        change("Add Entry") { $0.insert(line, at: Self.insertionIndex(for: position, in: $0)) }
         return line.id
     }
 
     func update(_ id: PgpassLine.ID, with entry: PgpassEntry) {
-        guard let i = lines.firstIndex(where: { $0.id == id }) else { return }
-        lines[i].setKind(.entry(entry))
-        isDirty = true
+        change("Edit Entry") { lines in
+            guard let i = lines.firstIndex(where: { $0.id == id }) else { return }
+            lines[i].setKind(.entry(entry))
+        }
     }
 
     @discardableResult
     func duplicate(_ id: PgpassLine.ID) -> PgpassLine.ID? {
         guard let i = lines.firstIndex(where: { $0.id == id }), let entry = lines[i].entry else { return nil }
         let copy = PgpassLine(kind: .entry(entry))
-        lines.insert(copy, at: i + 1)
-        isDirty = true
+        change("Duplicate Entry") { $0.insert(copy, at: i + 1) }
         return copy.id
     }
 
     func delete(_ id: PgpassLine.ID) {
-        lines.removeAll { $0.id == id }
-        isDirty = true
+        let name = line(id)?.entry != nil ? "Delete Entry" : "Delete Line"
+        change(name) { $0.removeAll { $0.id == id } }
     }
 
     func move(fromOffsets source: IndexSet, toOffset destination: Int) {
-        lines.move(fromOffsets: source, toOffset: destination)
-        isDirty = true
+        change("Move Entry") { $0.move(fromOffsets: source, toOffset: destination) }
     }
 
-    /// Drag reordering: puts `id` where `target` is, shifting `target`
-    /// down when moving up and up when moving down.
+    func move(_ id: PgpassLine.ID, above target: PgpassLine.ID) {
+        change("Move Entry") { lines in
+            guard id != target, let from = lines.firstIndex(where: { $0.id == id }) else { return }
+            let line = lines.remove(at: from)
+            let to = lines.firstIndex { $0.id == target } ?? 0
+            lines.insert(line, at: to)
+        }
+    }
+
+    /// Reorders so no entry is hidden by an earlier one. One undo step.
+    func applyOrderFix() {
+        let fix = PgpassOrderFixer.fix(lines)
+        guard fix.changesOrder else { return }
+        change("Fix Order") { $0 = fix.lines }
+    }
+
+    /// Deletes entries that repeat an earlier entry's host, port, database
+    /// and user. Those can never be used. One undo step.
+    func removeDuplicates() {
+        let ids = Set(PgpassOrderFixer.fix(lines).duplicates.map(\.lineID))
+        guard !ids.isEmpty else { return }
+        change("Remove Duplicates") { $0.removeAll { ids.contains($0.id) } }
+    }
+
+    // MARK: Drag to reorder
+
+    // A drag fires many small moves. They share one undo step: the snapshot is
+    // taken when the drag starts and registered when it's dropped.
+
+    func beginDrag() {
+        if dragSnapshot == nil { dragSnapshot = lines }
+    }
+
+    /// Puts `id` where `target` is, shifting `target` down when moving up and
+    /// up when moving down.
     func moveLive(_ id: PgpassLine.ID, to target: PgpassLine.ID) {
         guard let from = lines.firstIndex(where: { $0.id == id }),
               let to = lines.firstIndex(where: { $0.id == target }),
               from != to else { return }
         lines.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
-        isDirty = true
     }
 
-    func move(_ id: PgpassLine.ID, above target: PgpassLine.ID) {
-        guard id != target, let from = lines.firstIndex(where: { $0.id == id }) else { return }
-        let line = lines.remove(at: from)
-        let to = lines.firstIndex { $0.id == target } ?? 0
-        lines.insert(line, at: to)
-        isDirty = true
+    func endDrag() {
+        guard let snapshot = dragSnapshot else { return }
+        dragSnapshot = nil
+        if lines != snapshot { registerUndo("Move Entry", restoring: snapshot) }
     }
+
+    // MARK: Analysis
 
     /// What would happen if `candidate` were added at `position`, or put in
     /// place of `replacing` when editing.
